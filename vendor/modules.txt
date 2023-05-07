@@ -1,3 +1,11 @@
+# github.com/felixge/httpsnoop v1.0.3
+## explicit; go 1.13
+github.com/felixge/httpsnoop
 # github.com/gorilla/mux v1.8.0
 ## explicit; go 1.12
 github.com/gorilla/mux
+# github.com/gorilla/schema v1.2.0
+## explicit
+github.com/gorilla/schema
+# github.com/kjk/common v0.0.0-20230422073725-f928e5df10f8
+## explicit; go 1.16

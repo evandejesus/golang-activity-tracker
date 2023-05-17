@@ -38,7 +38,7 @@ func NewHTTPServer(addr string) *http.Server {
 		WriteTimeout: 120 * time.Second,
 		IdleTimeout:  120 * time.Second, // introduced in Go 1.8
 		Addr:         addr,
-		Handler:      r,
+		Handler:      handler,
 	}
 }
 

@@ -1,0 +1,8 @@
+88 1684002361248 httplog
+method: GET
+uri: /?id=1
+ipaddr: 127.0.0.1
+code: 200
+size: 75
+duration: 0
+ua: curl/8.0.1

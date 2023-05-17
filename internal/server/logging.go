@@ -2,12 +2,16 @@ package server
 
 import (
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/felixge/httpsnoop"
+	"github.com/kjk/common/siser"
+	"github.com/natefinch/lumberjack"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -30,8 +34,23 @@ type HTTPReqInfo struct {
 	userAgent string
 }
 
+var Logger zerolog.Logger
+
+func newLogger() zerolog.Logger {
+	z := zerolog.New(&lumberjack.Logger{
+		Filename:   "http_access.log", // File name
+		MaxSize:    100,               // Size in MB before file gets rotated
+		MaxBackups: 5,                 // Max number of files kept before being overwritten
+		MaxAge:     30,                // Max number of days to keep the files
+		Compress:   true,              // Whether to compress log files using gzip
+	})
+	return z.With().Caller().Timestamp().Logger()
+
+}
+
 func logRequestHandler(h http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
+
 		ri := HTTPReqInfo{
 			method:    r.Method,
 			uri:       r.URL.String(),
@@ -39,7 +58,7 @@ func logRequestHandler(h http.Handler) http.Handler {
 			userAgent: r.Header.Get("User-Agent"),
 		}
 
-		// ri.ipaddr = requestGetRemoteAddress(r)
+		ri.ipaddr = requestGetRemoteAddress(r)
 		m := httpsnoop.CaptureMetrics(h, w, r)
 
 		ri.code = m.Code
@@ -50,10 +69,6 @@ func logRequestHandler(h http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(fn)
 }
-
-// func logHTTPReq(ri *HTTPReqInfo) {
-
-// }
 
 func ipAddrFromRemoteAddr(s string) string {
 	idx := strings.LastIndex(s, ":")
@@ -84,22 +99,37 @@ func requestGetRemoteAddress(r *http.Request) string {
 	return hdrRealIP
 }
 
-func logHTTPReq(ri *HTTPReqInfo) {
+func logHTTPReq(ri *HTTPReqInfo) error {
+	w, err := createWriter()
+	if err != nil {
+		return err
+	}
+
 	var rec siser.Record
 	rec.Name = "httplog"
-	rec.Append("method", ri.method)
-	rec.Append("uri", ri.uri)
+	rec.Write("method", ri.method)
+	rec.Write("uri", ri.uri)
 	if ri.referer != "" {
-		rec.Append("referer", ri.referer)
+		rec.Write("referer", ri.referer)
 	}
-	rec.Append("ipaddr", ri.ipaddr)
-	rec.Append("code", strconv.Itoa(ri.code))
-	rec.Append("size", strconv.FormatInt(ri.size, 10))
-	durMs := ri.duration / time.Millisecond
-	rec.Append("duration", strconv.FormatInt(int64(durMs), 10))
-	rec.Append("ua", ri.userAgent)
+	rec.Write("ipaddr", ri.ipaddr)
+	rec.Write("code", strconv.Itoa(ri.code))
+	rec.Write("size", strconv.FormatInt(ri.size, 10))
+	dur := ri.duration / time.Millisecond
+	rec.Write("duration", strconv.FormatInt(int64(dur), 10))
+	rec.Write("ua", ri.userAgent)
 
 	muLogHTTP.Lock()
 	defer muLogHTTP.Unlock()
-	_, _ = httpLogSiser.WriteRecord(&rec)
+	_, err = w.WriteRecord(&rec)
+	return err
+}
+
+func createWriter() (*siser.Writer, error) {
+	f, err := os.Create("http_access.log")
+	if err != nil {
+		return nil, err
+	}
+	w := siser.NewWriter(f)
+	return w, nil
 }
